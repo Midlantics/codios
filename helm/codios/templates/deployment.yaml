@@ -1,0 +1,169 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "codios.fullname" . }}
+  labels:
+    {{- include "codios.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "codios.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        # Force pod restart when secret changes
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "codios.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "codios.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: api
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          env:
+            # ── Passwords (from secret, expanded inline for URL construction) ──
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: postgres-password
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: redis-password
+            # ── Connection URLs ──────────────────────────────────────────────
+            - name: DATABASE_URL
+              value: {{ include "codios.databaseUrl" . | quote }}
+            - name: REDIS_URL
+              value: {{ include "codios.redisUrl" . | quote }}
+            # ── Non-secret config ────────────────────────────────────────────
+            - name: VPC_MODE
+              value: {{ .Values.config.vpcMode | quote }}
+            - name: ALLOWED_ORIGINS
+              value: {{ .Values.config.allowedOrigins | quote }}
+            - name: APP_URL
+              value: {{ .Values.config.appUrl | quote }}
+            - name: SMTP_PORT
+              value: {{ .Values.config.smtpPort | quote }}
+            - name: AWS_REGION
+              value: {{ .Values.config.awsRegion | quote }}
+            - name: S3_AUDIT_BUCKET
+              value: {{ .Values.config.s3AuditBucket | quote }}
+            # ── Secrets ──────────────────────────────────────────────────────
+            - name: SUPABASE_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: jwt-secret
+            - name: GATEWAY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: gateway-secret
+            - name: CODIOS_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: codios-private-key
+            - name: CODIOS_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: codios-public-key
+            - name: CODIOS_DID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: codios-did
+            - name: CODIOS_LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: license-key
+            - name: CODIOS_LICENSE_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: license-public-key
+            - name: RESEND_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: resend-api-key
+            - name: RESEND_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: resend-from
+            - name: SMTP_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: smtp-host
+            - name: SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: smtp-user
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: smtp-password
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: aws-access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "codios.secretName" . }}
+                  key: aws-secret-access-key
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -119,6 +119,20 @@ async def _flush_once() -> None:
                 for e in batch
             ],
         )
+        # Fire webhooks for denied outcomes (fire-and-forget)
+        for e in batch:
+            if e.outcome == "denied":
+                try:
+                    from services.webhook_dispatcher import dispatch
+                    dispatch(e.org_id, "audit.denied", {
+                        "action": e.action,
+                        "deny_reason": e.deny_reason,
+                        "contract_id": e.contract_id,
+                        "issuer_agent_id": e.issuer_agent_id,
+                        "target_agent_id": e.target_agent_id,
+                    })
+                except Exception:
+                    pass
     except Exception as e:
         # Re-enqueue failed events (prepend so they're retried next flush)
         for event in reversed(batch):

@@ -118,6 +118,8 @@ async def create_agent(body: AgentCreate, request: Request):
     if returned_private:
         result["private_key"] = returned_private
         result["warning"] = "Store this private_key securely — it will not be shown again."
+    from services.webhook_dispatcher import dispatch
+    dispatch(org_id, "agent.created", {"agent_id": row["id"], "did": did, "name": body.name})
     return result
 
 
@@ -164,6 +166,9 @@ async def update_agent(agent_id: str, body: AgentUpdate, request: Request):
         """,
         agent_id, org_id, name, description, capabilities, agent_card, status,
     )
+    if status != current["status"]:
+        from services.webhook_dispatcher import dispatch
+        dispatch(org_id, "agent.status_changed", {"agent_id": agent_id, "status": status, "previous_status": current["status"]})
     return {"ok": True}
 
 
@@ -177,6 +182,40 @@ async def delete_agent(agent_id: str, request: Request):
     )
     if result == "DELETE 0":
         raise HTTPException(status_code=404, detail="Agent not found")
+
+
+# ── Heartbeat (agent → Codios) ────────────────────────────────────────────────
+
+@router.post("/{agent_id}/heartbeat", status_code=200)
+async def agent_heartbeat(agent_id: str, request: Request):
+    """
+    Lightweight liveness ping from a running agent. Updates last_seen_at and last_seen_ip.
+
+    Agents should call this on startup and every 30–60 seconds while running.
+    The caller must present a valid Codios API key or JWT (org ownership check).
+
+    Returns: {"ok": true, "last_seen_at": "<ISO timestamp>"}
+    """
+    org_id = await get_org_id(request)
+    pool = await get_pool()
+
+    ip = (
+        request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        or request.client.host if request.client else None
+    )
+
+    row = await pool.fetchrow(
+        """
+        UPDATE codios.agents
+        SET last_seen_at = NOW(), last_seen_ip = $3
+        WHERE id = $1 AND org_id = $2
+        RETURNING last_seen_at
+        """,
+        agent_id, org_id, ip,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return {"ok": True, "last_seen_at": row["last_seen_at"].isoformat()}
 
 
 # ── Agent Card (public, no auth) ──────────────────────────────────────────────

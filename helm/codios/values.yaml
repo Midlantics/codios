@@ -1,0 +1,142 @@
+# ── Codios Helm values ──────────────────────────────────────────────────────
+# Override with: helm install codios ./codios -f my-values.yaml
+
+# ── Image ─────────────────────────────────────────────────────────────────────
+image:
+  repository: ghcr.io/midlantics/codios
+  tag: ""          # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# ── Replicas / autoscaling ─────────────────────────────────────────────────────
+replicaCount: 1
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+# ── Service ────────────────────────────────────────────────────────────────────
+service:
+  type: ClusterIP
+  port: 8080
+
+# ── Ingress ────────────────────────────────────────────────────────────────────
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: codios.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: codios-tls
+  #    hosts:
+  #      - codios.example.com
+
+# ── Resources ──────────────────────────────────────────────────────────────────
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# ── Service account ────────────────────────────────────────────────────────────
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# ── Pod settings ───────────────────────────────────────────────────────────────
+podAnnotations: {}
+podSecurityContext: {}
+securityContext: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# ── Codios application config ─────────────────────────────────────────────────
+config:
+  # Public / non-secret settings
+  vpcMode: "true"
+  allowedOrigins: "*"
+  appUrl: "http://localhost:8080"
+  smtpPort: "587"
+  awsRegion: "us-east-1"
+  s3AuditBucket: ""
+
+# ── Secrets ────────────────────────────────────────────────────────────────────
+# Option A: supply values here — they are stored in a Kubernetes Secret.
+# Option B: reference an existing Secret with existingSecret (values below ignored).
+secrets:
+  postgresPassword: "change-me-postgres"
+  redisPassword: "change-me-redis"
+  jwtSecret: "change-me-jwt-secret-min-32-chars"
+  gatewaySecret: "change-me-gateway-secret"
+  codiosPrivateKey: ""
+  codiosPublicKey: ""
+  codiosDid: ""
+  licenseKey: ""
+  licensePublicKey: ""
+  resendApiKey: ""
+  resendFrom: "Codios Alerts <alerts@example.com>"
+  smtpHost: ""
+  smtpUser: ""
+  smtpPassword: ""
+  awsAccessKeyId: ""
+  awsSecretAccessKey: ""
+
+# Reference an existing Secret instead of creating one from the values above.
+existingSecret: ""
+
+# ── External DB / Redis ────────────────────────────────────────────────────────
+# Set these when postgresql.enabled=false / redis.enabled=false.
+externalDatabase:
+  host: ""
+  port: 5432
+  database: codios
+  user: codios
+  # password read from secrets.postgresPassword or existingSecret
+
+externalRedis:
+  host: ""
+  port: 6379
+  # password read from secrets.redisPassword or existingSecret
+
+# ── Bundled PostgreSQL (bitnami subchart) ──────────────────────────────────────
+postgresql:
+  enabled: true
+  auth:
+    database: codios
+    username: codios
+    # password injected at install time — see templates/secret.yaml
+    existingSecret: ""          # set to chart-managed secret name at render time
+    secretKeys:
+      userPasswordKey: postgres-password
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+
+# ── Bundled Redis (bitnami subchart) ──────────────────────────────────────────
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: true
+    existingSecret: ""          # set to chart-managed secret name at render time
+    existingSecretPasswordKey: redis-password
+  master:
+    persistence:
+      enabled: true
+      size: 2Gi

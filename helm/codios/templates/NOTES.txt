@@ -1,0 +1,28 @@
+Codios has been deployed!
+
+1. Get the application URL:
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}
+{{- end }}
+{{- else if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "codios.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo "http://$NODE_IP:$NODE_PORT"
+{{- else if contains "LoadBalancer" .Values.service.type }}
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+  kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "codios.fullname" . }}
+{{- else }}
+  kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "codios.fullname" . }} 8080:{{ .Values.service.port }}
+  echo "http://127.0.0.1:8080"
+{{- end }}
+
+2. Create your first API key:
+  curl http://<APP_URL>/keys -X POST \
+    -H "Authorization: Bearer <JWT>" \
+    -d '{"name":"My first key"}'
+
+3. Health check:
+  curl http://<APP_URL>/health
+
+For full documentation visit: https://codios.midlantics.com/docs

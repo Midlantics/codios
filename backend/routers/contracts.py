@@ -139,6 +139,14 @@ async def issue_contract(body: ContractIssueRequest, request: Request):
         expires,
     )
 
+    from services.webhook_dispatcher import dispatch
+    dispatch(org_id, "contract.created", {
+        "contract_id": contract_id,
+        "issuer_agent_id": body.issuer_agent_id,
+        "target_agent_id": body.target_agent_id,
+        "allowed_actions": body.allowed_actions,
+        "expires_at": expires.isoformat(),
+    })
     return {"ok": True, "contract_id": contract_id, "contract": signed_contract}
 
 
@@ -175,6 +183,8 @@ async def revoke_contract(contract_id: str, request: Request, reason: str = ""):
     )
     if result == "UPDATE 0":
         raise HTTPException(status_code=404, detail="Contract not found or already revoked/expired")
+    from services.webhook_dispatcher import dispatch
+    dispatch(org_id, "contract.revoked", {"contract_id": contract_id, "reason": reason})
     return {"ok": True}
 
 
