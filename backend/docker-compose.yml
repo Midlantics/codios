@@ -43,6 +43,8 @@ services:
       ALLOWED_ORIGINS:       ${ALLOWED_ORIGINS:-*}
       APP_URL:               ${APP_URL:-http://localhost:8080}
       GATEWAY_SECRET:        ${GATEWAY_SECRET}
+      CODIOS_LICENSE_KEY:    ${CODIOS_LICENSE_KEY:-}
+      CODIOS_LICENSE_PUBLIC_KEY: ${CODIOS_LICENSE_PUBLIC_KEY:-}
       RESEND_API_KEY:        ${RESEND_API_KEY:-}
       RESEND_FROM:           ${RESEND_FROM:-Codios Alerts <alerts@example.com>}
       SMTP_HOST:             ${SMTP_HOST:-}
