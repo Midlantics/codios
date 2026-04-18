@@ -1,6 +1,6 @@
 <div align="center">
   <h1>Codios</h1>
-  <p><strong>A2A Agent Security Layer — open source enforcement core</strong></p>
+  <p><strong>A2A AI Agent Security Layer — open source enforcement core</strong></p>
   <p>
     <a href="https://codios.midlantics.com">SaaS Dashboard</a> ·
     <a href="https://codios.midlantics.com/docs">Documentation</a> ·
@@ -160,4 +160,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues → security@midlantics.
 
 Apache 2.0 — see [LICENSE](LICENSE).
 
-Built by [Midlantics](https://midlantics.com).
+Built by [Midlantics](https://midlantics.com). Copyright Sensart Technologies LLC 2026.
