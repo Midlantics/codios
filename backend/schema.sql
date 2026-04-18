@@ -1,16 +1,16 @@
--- Codios schema — VPC / self-hosted edition
--- Identical table structure to schema.sql.
--- No Supabase-specific roles, no RLS (application layer handles authorization).
--- Applied automatically on startup when VPC_MODE=true.
+-- Codios schema — A2A Agent Security Layer
+-- Shares the same Supabase instance as the a2a schema.
+-- Run in Supabase SQL editor OR auto-applied by backend on startup.
 
 CREATE SCHEMA IF NOT EXISTS codios;
 
--- ── Organizations ──────────────────────────────────────────────────────────────
+-- ── Organizations ─────────────────────────────────────────────────────────────
+-- org_id = Supabase user UUID (same as a2a workspace_id pattern)
 
 CREATE TABLE IF NOT EXISTS codios.organizations (
-  id          TEXT PRIMARY KEY,
+  id          TEXT PRIMARY KEY,   -- Supabase user UUID
   name        TEXT NOT NULL DEFAULT 'My Organization',
-  plan        TEXT NOT NULL DEFAULT 'enterprise' CHECK (plan IN ('free','starter','pro','enterprise')),
+  plan        TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free','starter','pro','enterprise')),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS codios.agents (
   org_id       TEXT NOT NULL REFERENCES codios.organizations(id) ON DELETE CASCADE,
   name         TEXT NOT NULL,
   description  TEXT NOT NULL DEFAULT '',
-  did          TEXT UNIQUE NOT NULL,
-  public_key   TEXT NOT NULL,
+  did          TEXT UNIQUE NOT NULL,      -- did:key:z6Mk... (Ed25519 DID)
+  public_key   TEXT NOT NULL,             -- raw Ed25519 public key, base64
   capabilities TEXT[] NOT NULL DEFAULT '{}',
   agent_card   JSONB NOT NULL DEFAULT '{}',
   status       TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended','revoked')),
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS codios.contracts (
   resource_limits   JSONB NOT NULL DEFAULT '{}',
   nonce             TEXT UNIQUE NOT NULL,
   signature         TEXT NOT NULL,
-  payload           JSONB NOT NULL DEFAULT '{}',
+  payload           JSONB NOT NULL DEFAULT '{}',   -- full signed contract JSON
   status            TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','revoked','expired')),
   issued_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   expires_at        TIMESTAMPTZ NOT NULL,
@@ -61,6 +61,7 @@ CREATE INDEX IF NOT EXISTS codios_contracts_status  ON codios.contracts(org_id, 
 CREATE INDEX IF NOT EXISTS codios_contracts_expires ON codios.contracts(expires_at);
 
 -- ── Audit Logs ────────────────────────────────────────────────────────────────
+-- Append-only: rules prevent UPDATE and DELETE
 
 CREATE TABLE IF NOT EXISTS codios.audit_logs (
   id              BIGSERIAL PRIMARY KEY,
@@ -83,6 +84,7 @@ CREATE INDEX IF NOT EXISTS codios_audit_contract ON codios.audit_logs(contract_i
 CREATE INDEX IF NOT EXISTS codios_audit_outcome  ON codios.audit_logs(org_id, outcome, created_at DESC);
 
 -- ── Nonces ────────────────────────────────────────────────────────────────────
+-- Replay protection fallback (primary is Redis; this is the Postgres fallback)
 
 CREATE TABLE IF NOT EXISTS codios.nonces (
   nonce       TEXT PRIMARY KEY,
@@ -110,34 +112,75 @@ CREATE INDEX IF NOT EXISTS codios_api_keys_org   ON codios.api_keys(org_id);
 CREATE INDEX IF NOT EXISTS codios_api_keys_hash  ON codios.api_keys(key_hash) WHERE revoked = false;
 CREATE INDEX IF NOT EXISTS codios_api_keys_agent ON codios.api_keys(agent_id);
 
--- ── Subscriptions ─────────────────────────────────────────────────────────────
+-- ── Row Level Security ────────────────────────────────────────────────────────
 
+ALTER TABLE codios.organizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE codios.agents        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE codios.contracts     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE codios.audit_logs    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE codios.nonces        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE codios.api_keys      ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "service_role_all" ON codios.organizations FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service_role_all" ON codios.agents        FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service_role_all" ON codios.contracts     FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service_role_all" ON codios.audit_logs    FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service_role_all" ON codios.nonces        FOR ALL TO service_role USING (true) WITH CHECK (true);
+CREATE POLICY "service_role_all" ON codios.api_keys      FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+
+----Make it readable from external, 
+
+
+  GRANT USAGE ON SCHEMA codios TO anon, authenticated, service_role;
+  GRANT ALL ON ALL TABLES IN SCHEMA codios TO anon, authenticated,
+  service_role;                                                               
+  GRANT ALL ON ALL SEQUENCES IN SCHEMA codios TO anon, authenticated,
+  service_role;                                                               
+  GRANT ALL ON ALL FUNCTIONS IN SCHEMA codios TO anon, authenticated,
+  service_role;                                                               
+  
+  -- Make sure future objects in this schema also get these grants            
+  ALTER DEFAULT PRIVILEGES IN SCHEMA codios                
+    GRANT ALL ON TABLES TO anon, authenticated, service_role;                 
+  ALTER DEFAULT PRIVILEGES IN SCHEMA codios
+    GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;              
+  ALTER DEFAULT PRIVILEGES IN SCHEMA codios                                  
+    GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+    
+
+---  Add CODIOS in Project>Settings>Integration>Data API, Exposed schemas and Extra search path
+-- ── Subscriptions ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS codios.subscriptions (
-  org_id      TEXT PRIMARY KEY REFERENCES codios.organizations(id) ON DELETE CASCADE,
-  plan        TEXT NOT NULL DEFAULT 'enterprise' CHECK (plan IN ('free','starter','pro','enterprise')),
-  status      TEXT NOT NULL DEFAULT 'active',
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  org_id                   TEXT PRIMARY KEY REFERENCES codios.organizations(id) ON DELETE CASCADE,
+  plan                     TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free','starter','pro','enterprise')),
+  status                   TEXT NOT NULL DEFAULT 'active',
+  stripe_customer_id       TEXT,
+  stripe_subscription_id   TEXT,
+  current_period_end       TIMESTAMPTZ,
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ── Custom Policies ───────────────────────────────────────────────────────────
-
+-- ── Custom Policies ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS codios.custom_policies (
-  id               TEXT PRIMARY KEY DEFAULT 'pol_' || replace(gen_random_uuid()::text, '-', ''),
-  org_id           TEXT NOT NULL REFERENCES codios.organizations(id) ON DELETE CASCADE,
-  name             TEXT NOT NULL,
-  description      TEXT NOT NULL DEFAULT '',
-  rego_source      TEXT NOT NULL,
-  active           BOOLEAN NOT NULL DEFAULT FALSE,
-  last_tested_at   TIMESTAMPTZ,
+  id          TEXT PRIMARY KEY DEFAULT 'pol_' || replace(gen_random_uuid()::text, '-', ''),
+  org_id      TEXT NOT NULL REFERENCES codios.organizations(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  rego_source TEXT NOT NULL,
+  active      BOOLEAN NOT NULL DEFAULT FALSE,
+  last_tested_at  TIMESTAMPTZ,
   last_test_result JSONB,
-  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS codios_policies_org ON codios.custom_policies(org_id);
 
--- ── Alert Rules ───────────────────────────────────────────────────────────────
+ALTER TABLE codios.custom_policies ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "service_role_all" ON codios.custom_policies FOR ALL TO service_role USING (true) WITH CHECK (true);
 
+-- ── Alert Rules ────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS codios.alert_rules (
   id               TEXT PRIMARY KEY DEFAULT 'alr_' || replace(gen_random_uuid()::text, '-', ''),
   org_id           TEXT NOT NULL REFERENCES codios.organizations(id) ON DELETE CASCADE,
@@ -155,8 +198,10 @@ CREATE TABLE IF NOT EXISTS codios.alert_rules (
 
 CREATE INDEX IF NOT EXISTS codios_alert_rules_org ON codios.alert_rules(org_id);
 
+ALTER TABLE codios.alert_rules ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "service_role_all" ON codios.alert_rules FOR ALL TO service_role USING (true) WITH CHECK (true);
+
 -- ── Audit immutability trigger ───────────────────────────────────────────────
--- Prevents UPDATE and DELETE on audit_logs at the DB level (ISO A.12.4).
 
 CREATE OR REPLACE FUNCTION codios.audit_logs_immutable()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
@@ -191,16 +236,17 @@ CREATE TABLE IF NOT EXISTS codios.audit_exports (
 );
 
 CREATE INDEX IF NOT EXISTS codios_audit_exports_org ON codios.audit_exports(org_id, created_at DESC);
+ALTER TABLE codios.audit_exports ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "service_role_all" ON codios.audit_exports FOR ALL TO service_role USING (true) WITH CHECK (true);
 
--- ── Denial spike check ────────────────────────────────────────────────────────
-
+-- ── Denial spike check function ────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION codios.denial_spike_check(p_since TIMESTAMPTZ, p_threshold INTEGER)
 RETURNS TABLE(org_id TEXT, denial_count BIGINT, agent_ids TEXT[])
 LANGUAGE SQL AS $$
   SELECT
     org_id,
-    COUNT(*)                             AS denial_count,
-    ARRAY_AGG(DISTINCT issuer_agent_id)  AS agent_ids
+    COUNT(*)                          AS denial_count,
+    ARRAY_AGG(DISTINCT issuer_agent_id) AS agent_ids
   FROM codios.audit_logs
   WHERE outcome = 'denied'
     AND created_at >= p_since
@@ -208,28 +254,12 @@ LANGUAGE SQL AS $$
   HAVING COUNT(*) >= p_threshold;
 $$;
 
--- ── VPC bootstrap: default org + subscription ─────────────────────────────────
--- Creates a single org on first run. API keys are created via POST /keys.
-
-INSERT INTO codios.organizations (id, name, plan)
-VALUES ('vpc-default-org', 'My Organization', 'enterprise')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO codios.subscriptions (org_id, plan, status)
-VALUES ('vpc-default-org', 'enterprise', 'active')
-ON CONFLICT (org_id) DO NOTHING;
-
 -- ── Org Members ──────────────────────────────────────────────────────────────
--- Roles: owner > admin > member > viewer
--- owner: 1 per org, cannot be removed or role-changed
--- admin: invite/remove members, manage all resources
--- member: full resource access, no team management
--- viewer: read-only
 
 CREATE TABLE IF NOT EXISTS codios.org_members (
   id                TEXT PRIMARY KEY DEFAULT 'mem_' || replace(gen_random_uuid()::text, '-', ''),
   org_id            TEXT NOT NULL REFERENCES codios.organizations(id) ON DELETE CASCADE,
-  user_id           TEXT,                   -- NULL until invite is accepted
+  user_id           TEXT,
   email             TEXT NOT NULL,
   role              TEXT NOT NULL DEFAULT 'member'
                     CHECK (role IN ('owner','admin','member','viewer')),
@@ -251,10 +281,8 @@ CREATE INDEX IF NOT EXISTS codios_org_members_user
 CREATE INDEX IF NOT EXISTS codios_org_members_token
   ON codios.org_members(invite_token) WHERE invite_token IS NOT NULL;
 
--- Bootstrap VPC owner membership
-INSERT INTO codios.org_members (org_id, user_id, email, role, status, joined_at)
-VALUES ('vpc-default-org', 'vpc-default-org', '', 'owner', 'active', NOW())
-ON CONFLICT DO NOTHING;
+ALTER TABLE codios.org_members ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "service_role_all" ON codios.org_members FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 -- ── SSO Configs ───────────────────────────────────────────────────────────────
 
@@ -269,3 +297,6 @@ CREATE TABLE IF NOT EXISTS codios.sso_configs (
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE codios.sso_configs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "service_role_all" ON codios.sso_configs FOR ALL TO service_role USING (true) WITH CHECK (true);

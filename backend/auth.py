@@ -1,9 +1,14 @@
 import hashlib
+import secrets
 from fastapi import Request, HTTPException
 from jose import jwt, JWTError
 from config import get_settings
 
 _PREFIX = "codios_sk_"
+
+# Higher index = lower privilege
+ROLES = ("owner", "admin", "member", "viewer")
+ROLE_LEVEL = {r: i for i, r in enumerate(ROLES)}
 
 
 def _extract_token(request: Request) -> str | None:
@@ -44,7 +49,13 @@ async def _resolve_api_key(raw_key: str) -> str | None:
 
 
 async def get_org_id(request: Request) -> str:
-    """Resolve org_id from Bearer token (Codios API key or Supabase JWT). Raises 401 if invalid."""
+    """Resolve org_id from auth header. Raises 401 if invalid."""
+    org_id, _ = await get_org_id_and_role(request)
+    return org_id
+
+
+async def get_org_id_and_role(request: Request) -> tuple[str, str]:
+    """Returns (org_id, role). API keys get role='admin'."""
     token = _extract_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="Authorization header required")
@@ -53,22 +64,58 @@ async def get_org_id(request: Request) -> str:
         org_id = await _resolve_api_key(token)
         if not org_id:
             raise HTTPException(status_code=401, detail="Invalid or revoked API key")
-        return org_id
+        return org_id, "admin"
 
     payload = verify_token(token)
-    sub = payload.get("sub")
-    if not sub:
+    user_id = payload.get("sub")
+    if not user_id:
         raise HTTPException(status_code=401, detail="Token missing sub claim")
 
-    # Auto-provision org on first login
-    await _ensure_org(sub)
-    return sub
+    email = payload.get("email", "")
+    return await _resolve_or_bootstrap(user_id, email)
 
 
-async def _ensure_org(org_id: str) -> None:
+async def _resolve_or_bootstrap(user_id: str, email: str) -> tuple[str, str]:
     from db import get_pool
-    from config import get_settings
     pool = await get_pool()
+
+    # Check existing active membership
+    row = await pool.fetchrow(
+        "SELECT org_id, role FROM codios.org_members WHERE user_id = $1 AND status = 'active' LIMIT 1",
+        user_id,
+    )
+    if row:
+        return str(row["org_id"]), str(row["role"])
+
+    # Auto-accept pending invite matching this email
+    if email:
+        invite = await pool.fetchrow(
+            """
+            SELECT id, org_id, role FROM codios.org_members
+            WHERE email = $1 AND status = 'pending'
+              AND (invite_expires_at IS NULL OR invite_expires_at > NOW())
+            LIMIT 1
+            """,
+            email,
+        )
+        if invite:
+            await pool.execute(
+                """
+                UPDATE codios.org_members
+                SET user_id=$2, status='active', invite_token=NULL, joined_at=NOW()
+                WHERE id=$1
+                """,
+                invite["id"], user_id,
+            )
+            return str(invite["org_id"]), str(invite["role"])
+
+    # First login — bootstrap as owner of their own org
+    await _bootstrap_owner(pool, user_id, email)
+    return user_id, "owner"
+
+
+async def _bootstrap_owner(pool, user_id: str, email: str) -> None:
+    from config import get_settings
     plan = "enterprise" if get_settings().vpc_mode else "free"
     await pool.execute(
         """
@@ -76,5 +123,20 @@ async def _ensure_org(org_id: str) -> None:
         VALUES ($1, $2)
         ON CONFLICT (id) DO NOTHING
         """,
-        org_id, plan,
+        user_id, plan,
     )
+    await pool.execute(
+        """
+        INSERT INTO codios.org_members (org_id, user_id, email, role, status, joined_at)
+        VALUES ($1, $2, $3, 'owner', 'active', NOW())
+        ON CONFLICT DO NOTHING
+        """,
+        user_id, user_id, email,
+    )
+
+
+# keep for backward compat (used by sso.py)
+async def _ensure_org(org_id: str) -> None:
+    from db import get_pool
+    pool = await get_pool()
+    await _bootstrap_owner(pool, org_id, "")
