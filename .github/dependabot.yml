@@ -27,6 +27,15 @@ updates:
     open-pull-requests-limit: 5
     labels: ["dependencies", "typescript"]
 
+  # Python SDK
+  - package-ecosystem: pip
+    directory: /sdk-python
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "python"]
+
   # GitHub Actions
   - package-ecosystem: github-actions
     directory: /

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/logo.png" alt="Codios Logo" width="120">
+  <img src="https://codios.midlantics.com/_next/image?url=%2Fimages%2Flogo.png&w=256&q=75" alt="Codios Logo" width="120">
   <h1>Codios</h1>
   <p><strong>A2A AI Agent Security Layer — open source enforcement core</strong></p>
   <p>

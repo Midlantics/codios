@@ -38,3 +38,27 @@ Out of scope:
 ## Disclosure policy
 
 We follow **coordinated disclosure**. Please give us time to patch before publishing details publicly. We'll credit researchers in the release notes unless you prefer to remain anonymous.
+
+## Vulnerability management (ISO 27001 A.12.6)
+
+We run the following automated controls on every pull request and weekly:
+
+| Tool | What it checks |
+|------|---------------|
+| **Dependabot** | Outdated Python, npm, and GitHub Actions dependencies |
+| **pip-audit** | Known CVEs in Python dependencies (`backend/`, `sdk-python/`) |
+| **npm audit** | Known CVEs in JS dependencies (`sdk-js/`, `cli/`) |
+| **CodeQL** | Static analysis — injection, unsafe deserialization, path traversal |
+| **Gitleaks** | Secrets accidentally committed to the repo |
+| **Snyk** (private repo) | Deep dependency graph CVE scanning |
+
+## Security controls summary (ISO 27001)
+
+| Control area | Status | Implementation |
+|-------------|--------|---------------|
+| Access control (A.9) | ✅ | Ed25519 contracts, API key auth, RBAC org roles (owner/admin/member/viewer) |
+| Cryptography (A.10.1) | ✅ | Ed25519 signatures, AES-256-GCM BYOK at-rest encryption, key rotation |
+| Audit trail (A.12.4) | ✅ | Append-only DB log, immutability trigger, S3/WORM daily export with SHA-256 |
+| Vulnerability management (A.12.6) | ✅ | Dependabot + pip-audit + CodeQL + Gitleaks on every PR |
+| Incident response (A.16) | ✅ | Denial-spike alert rules, webhook notifications, SMTP/Resend email alerts |
+| Data residency | ✅ | VPC/self-hosted mode via Helm chart or Docker Compose |

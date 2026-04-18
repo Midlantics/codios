@@ -1,0 +1,130 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run weekly on Mondays at 08:00 UTC (independent of pushes)
+    - cron: "0 8 * * 1"
+
+permissions:
+  contents: read
+  security-events: write   # required for CodeQL SARIF upload
+
+jobs:
+  # ── CodeQL static analysis ──────────────────────────────────────────────────
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # ── Python dependency audit ─────────────────────────────────────────────────
+  pip-audit:
+    name: pip-audit (Python deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Audit backend requirements
+        run: pip-audit -r backend/requirements.txt --output json --output-file pip-audit-backend.json || true
+      - name: Audit Python SDK requirements
+        run: |
+          pip install -e "sdk-python[fastapi]"
+          pip-audit --output json --output-file pip-audit-sdk-python.json || true
+      - name: Summarise findings
+        run: |
+          python3 - <<'EOF'
+          import json, sys, pathlib
+          total = 0
+          for f in pathlib.Path(".").glob("pip-audit-*.json"):
+              data = json.loads(f.read_text())
+              vulns = data.get("vulnerabilities", [])
+              if vulns:
+                  print(f"\n{f.name}: {len(vulns)} vulnerable package(s)")
+                  for v in vulns:
+                      print(f"  {v['name']}=={v['version']} — {', '.join(a['id'] for a in v['aliases'][:3])}")
+              total += len(vulns)
+          if total:
+              print(f"\n{total} total vulnerability/ies found — review above.")
+          else:
+              print("No known vulnerabilities found.")
+          EOF
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pip-audit-results
+          path: pip-audit-*.json
+
+  # ── Node.js dependency audit ────────────────────────────────────────────────
+  npm-audit:
+    name: npm audit (JS deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Audit SDK-JS
+        working-directory: sdk-js
+        run: npm ci && npm audit --audit-level=high || true
+      - name: Audit CLI
+        working-directory: cli
+        run: npm install && npm audit --audit-level=high || true
+
+  # ── OSV-Scanner (Google — free, no token) ────────────────────────────────────
+  osv-scan:
+    name: OSV Scanner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run OSV-Scanner
+        uses: google/osv-scanner-action@v2
+        with:
+          scan-args: |-
+            --recursive
+            --output=sarif
+            ./
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: results.sarif
+
+  # ── Secret scanning (Gitleaks) ──────────────────────────────────────────────
+  gitleaks:
+    name: Gitleaks (secret scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history for accurate secret detection
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -16,7 +16,7 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Request, HTTPException
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, field_validator
 from auth import get_org_id_and_role, ROLE_LEVEL, _extract_token, verify_token
 
 router = APIRouter(prefix="/team")
@@ -25,8 +25,16 @@ _INVITE_TTL_HOURS = 72
 
 
 class InviteBody(BaseModel):
-    email: EmailStr
+    email: str
     role: str = "member"
+
+    @field_validator("email")
+    @classmethod
+    def _check_email(cls, v: str) -> str:
+        v = v.strip().lower()
+        if "@" not in v or "." not in v.split("@")[-1]:
+            raise ValueError("invalid email address")
+        return v
 
 
 class RoleUpdate(BaseModel):

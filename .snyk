@@ -1,0 +1,7 @@
+# Snyk policy file — https://docs.snyk.io/snyk-cli/test-for-vulnerabilities/the-.snyk-file
+version: v1.25.0
+
+# Ignore rules (add entries here when a CVE has no fix available or is a false positive)
+ignore: {}
+
+patch: {}
