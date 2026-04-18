@@ -1,0 +1,49 @@
+{
+  "name": "@codios/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Codios — A2A Agent Security Layer",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./middleware/express": {
+      "import": "./dist/middleware/express.js",
+      "types": "./dist/middleware/express.d.ts"
+    },
+    "./middleware/fetch": {
+      "import": "./dist/middleware/fetch.js",
+      "types": "./dist/middleware/fetch.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["ai", "agents", "a2a", "security", "contracts", "ed25519", "codios"],
+  "license": "MIT",
+  "homepage": "https://codios.midlantics.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Navruzjon/codios-sdk-js"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.4.0",
+    "bs58": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^20",
+    "typescript": "^5.7.0"
+  },
+  "peerDependencies": {
+    "express": ">=4"
+  },
+  "peerDependenciesMeta": {
+    "express": { "optional": true }
+  }
+}

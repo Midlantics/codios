@@ -1,0 +1,27 @@
+{
+  "name": "@codios/cli",
+  "version": "0.1.0",
+  "description": "CLI for Codios — A2A Agent Security Layer",
+  "type": "module",
+  "bin": {
+    "codios": "./dist/index.js"
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "node --loader ts-node/esm src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["ai", "agents", "a2a", "security", "codios", "cli"],
+  "license": "MIT",
+  "homepage": "https://codios.midlantics.com",
+  "dependencies": {
+    "@codios/sdk": "file:../codios-sdk-js",
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,60 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       codios
+      POSTGRES_USER:     codios
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codios -d codios"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      DATABASE_URL:          postgresql://codios:${POSTGRES_PASSWORD}@postgres:5432/codios
+      REDIS_URL:             redis://:${REDIS_PASSWORD}@redis:6379
+      VPC_MODE:              "true"
+      CODIOS_PRIVATE_KEY:    ${CODIOS_PRIVATE_KEY}
+      CODIOS_PUBLIC_KEY:     ${CODIOS_PUBLIC_KEY}
+      CODIOS_DID:            ${CODIOS_DID}
+      SUPABASE_JWT_SECRET:   ${JWT_SECRET}
+      ALLOWED_ORIGINS:       ${ALLOWED_ORIGINS:-*}
+      APP_URL:               ${APP_URL:-http://localhost:8080}
+      GATEWAY_SECRET:        ${GATEWAY_SECRET}
+      RESEND_API_KEY:        ${RESEND_API_KEY:-}
+      RESEND_FROM:           ${RESEND_FROM:-Codios Alerts <alerts@example.com>}
+      SMTP_HOST:             ${SMTP_HOST:-}
+      SMTP_PORT:             ${SMTP_PORT:-587}
+      SMTP_USER:             ${SMTP_USER:-}
+      SMTP_PASSWORD:         ${SMTP_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
