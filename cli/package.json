@@ -13,10 +13,19 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": ["ai", "agents", "a2a", "security", "codios", "cli"],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "homepage": "https://codios.midlantics.com",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Midlantics/codios",
+    "directory": "cli"
+  },
   "dependencies": {
-    "@codios/sdk": "file:../codios-sdk-js",
+    "@codios/sdk": "^0.1.0",
     "commander": "^12.1.0",
     "picocolors": "^1.1.1"
   },

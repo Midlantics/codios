@@ -218,3 +218,17 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO codios.subscriptions (org_id, plan, status)
 VALUES ('vpc-default-org', 'enterprise', 'active')
 ON CONFLICT (org_id) DO NOTHING;
+
+-- ── SSO Configs ───────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS codios.sso_configs (
+  id             TEXT PRIMARY KEY DEFAULT 'sso_' || replace(gen_random_uuid()::text, '-', ''),
+  org_id         TEXT NOT NULL REFERENCES codios.organizations(id) ON DELETE CASCADE UNIQUE,
+  provider_name  TEXT NOT NULL DEFAULT 'OIDC',
+  issuer_url     TEXT NOT NULL,
+  client_id      TEXT NOT NULL,
+  client_secret  TEXT NOT NULL,
+  enabled        BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
