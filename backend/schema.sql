@@ -34,6 +34,11 @@ CREATE INDEX IF NOT EXISTS codios_agents_org    ON codios.agents(org_id);
 CREATE INDEX IF NOT EXISTS codios_agents_did    ON codios.agents(did);
 CREATE INDEX IF NOT EXISTS codios_agents_status ON codios.agents(org_id, status);
 
+ALTER TABLE codios.agents ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+ALTER TABLE codios.agents ADD COLUMN IF NOT EXISTS last_seen_ip TEXT;
+
+CREATE INDEX IF NOT EXISTS codios_agents_last_seen ON codios.agents(org_id, last_seen_at DESC);
+
 -- ── Contracts ─────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS codios.contracts (
@@ -253,6 +258,43 @@ LANGUAGE SQL AS $$
   GROUP BY org_id
   HAVING COUNT(*) >= p_threshold;
 $$;
+
+-- ── Webhook Endpoints ────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS codios.webhook_endpoints (
+  id          TEXT PRIMARY KEY DEFAULT 'wh_' || replace(gen_random_uuid()::text, '-', ''),
+  org_id      TEXT NOT NULL REFERENCES codios.organizations(id) ON DELETE CASCADE,
+  url         TEXT NOT NULL,
+  secret      TEXT NOT NULL,
+  events      TEXT[] NOT NULL DEFAULT '{}',
+  description TEXT NOT NULL DEFAULT '',
+  enabled     BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS codios_webhooks_org ON codios.webhook_endpoints(org_id) WHERE enabled = TRUE;
+
+ALTER TABLE codios.webhook_endpoints ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "service_role_all" ON codios.webhook_endpoints FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS codios.webhook_deliveries (
+  id            TEXT PRIMARY KEY DEFAULT 'wdl_' || replace(gen_random_uuid()::text, '-', ''),
+  endpoint_id   TEXT NOT NULL REFERENCES codios.webhook_endpoints(id) ON DELETE CASCADE,
+  org_id        TEXT NOT NULL,
+  event_type    TEXT NOT NULL,
+  payload       JSONB NOT NULL DEFAULT '{}',
+  status_code   INTEGER,
+  success       BOOLEAN NOT NULL DEFAULT FALSE,
+  duration_ms   INTEGER,
+  error         TEXT,
+  attempted_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS codios_wdl_endpoint ON codios.webhook_deliveries(endpoint_id, attempted_at DESC);
+
+ALTER TABLE codios.webhook_deliveries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "service_role_all" ON codios.webhook_deliveries FOR ALL TO service_role USING (true) WITH CHECK (true);
 
 -- ── Org Members ──────────────────────────────────────────────────────────────
 

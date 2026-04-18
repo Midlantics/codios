@@ -34,6 +34,12 @@ CREATE INDEX IF NOT EXISTS codios_agents_org    ON codios.agents(org_id);
 CREATE INDEX IF NOT EXISTS codios_agents_did    ON codios.agents(did);
 CREATE INDEX IF NOT EXISTS codios_agents_status ON codios.agents(org_id, status);
 
+-- Heartbeat columns (added via ALTER so existing deploys can run the schema idempotently)
+ALTER TABLE codios.agents ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+ALTER TABLE codios.agents ADD COLUMN IF NOT EXISTS last_seen_ip TEXT;
+
+CREATE INDEX IF NOT EXISTS codios_agents_last_seen ON codios.agents(org_id, last_seen_at DESC);
+
 -- ── Contracts ─────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS codios.contracts (
@@ -218,6 +224,37 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO codios.subscriptions (org_id, plan, status)
 VALUES ('vpc-default-org', 'enterprise', 'active')
 ON CONFLICT (org_id) DO NOTHING;
+
+-- ── Webhook Endpoints ────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS codios.webhook_endpoints (
+  id          TEXT PRIMARY KEY DEFAULT 'wh_' || replace(gen_random_uuid()::text, '-', ''),
+  org_id      TEXT NOT NULL REFERENCES codios.organizations(id) ON DELETE CASCADE,
+  url         TEXT NOT NULL,
+  secret      TEXT NOT NULL,          -- HMAC-SHA256 signing secret (shown once at creation)
+  events      TEXT[] NOT NULL DEFAULT '{}',  -- subscribed event types; empty = all events
+  description TEXT NOT NULL DEFAULT '',
+  enabled     BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS codios_webhooks_org ON codios.webhook_endpoints(org_id) WHERE enabled = TRUE;
+
+CREATE TABLE IF NOT EXISTS codios.webhook_deliveries (
+  id            TEXT PRIMARY KEY DEFAULT 'wdl_' || replace(gen_random_uuid()::text, '-', ''),
+  endpoint_id   TEXT NOT NULL REFERENCES codios.webhook_endpoints(id) ON DELETE CASCADE,
+  org_id        TEXT NOT NULL,
+  event_type    TEXT NOT NULL,
+  payload       JSONB NOT NULL DEFAULT '{}',
+  status_code   INTEGER,
+  success       BOOLEAN NOT NULL DEFAULT FALSE,
+  duration_ms   INTEGER,
+  error         TEXT,
+  attempted_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS codios_wdl_endpoint ON codios.webhook_deliveries(endpoint_id, attempted_at DESC);
 
 -- ── Org Members ──────────────────────────────────────────────────────────────
 -- Roles: owner > admin > member > viewer

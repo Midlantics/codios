@@ -51,6 +51,16 @@ async def _expire_contracts() -> None:
             count = int(result.split()[-1]) if result else 0
             if count:
                 logger.info("[scheduler] expired %d contracts", count)
+                # Notify orgs of expired contracts (best-effort)
+                try:
+                    expired_rows = await pool.fetch(
+                        "SELECT id, org_id FROM codios.contracts WHERE status='expired' AND expires_at >= NOW() - INTERVAL '16 minutes'"
+                    )
+                    from services.webhook_dispatcher import dispatch
+                    for row in expired_rows:
+                        dispatch(row["org_id"], "contract.expired", {"contract_id": row["id"]})
+                except Exception:
+                    pass
         except Exception:
             logger.exception("[scheduler] expire_contracts error")
 

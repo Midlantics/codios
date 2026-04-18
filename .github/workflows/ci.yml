@@ -26,7 +26,25 @@ jobs:
           SUPABASE_JWT_SECRET: test-secret-min-32-chars-long-xxx
         run: python -c "import main"
 
-  sdk:
+  sdk-python:
+    name: Python SDK
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install SDK with test extras
+        working-directory: sdk-python
+        run: pip install -e ".[fastapi]" pytest
+      - name: Run tests
+        working-directory: sdk-python
+        run: pytest -v
+
+  sdk-js:
     name: SDK (TypeScript)
     runs-on: ubuntu-latest
     steps:

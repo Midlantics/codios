@@ -1,0 +1,27 @@
+apiVersion: v2
+name: codios
+description: Codios — A2A Agent Security Layer (VPC edition)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://codios.midlantics.com
+sources:
+  - https://github.com/Midlantics/codios
+keywords:
+  - a2a
+  - agent-security
+  - ai
+  - mcp
+maintainers:
+  - name: Midlantics
+    email: support@midlantics.com
+
+dependencies:
+  - name: postgresql
+    version: "15.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "19.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
