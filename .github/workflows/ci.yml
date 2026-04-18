@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Syntax check
+        run: python -m py_compile $(find backend -name "*.py" | grep -v __pycache__)
+      - name: Import check
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://x:x@localhost/x
+          SUPABASE_JWT_SECRET: test-secret-min-32-chars-long-xxx
+        run: python -c "import main"
+
+  sdk:
+    name: SDK (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install & build
+        working-directory: sdk-js
+        run: npm ci && npm run build
+      - name: Smoke test
+        working-directory: sdk-js
+        run: |
+          node --input-type=module << 'JS'
+          import { generateAgentKeyPair, issueContract, verifyContract } from "./dist/index.js";
+          const a = await generateAgentKeyPair();
+          const b = await generateAgentKeyPair();
+          const plat = await generateAgentKeyPair();
+          const c = await issueContract({ issuer_did: a.did, subject_did: b.did, actions: ["read"], ttl_seconds: 60 }, plat.privateKey);
+          const r = await verifyContract(c.encoded, plat.publicKey, "read");
+          if (!r.valid) throw new Error("verify failed: " + r.reason);
+          console.log("SDK smoke test passed");
+          JS
+
+  cli:
+    name: CLI (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install SDK first
+        working-directory: sdk-js
+        run: npm ci && npm run build
+      - name: Install & build CLI
+        working-directory: cli
+        run: |
+          npm install --save @codios/sdk@file:../sdk-js
+          npm run build
+      - name: CLI help check
+        working-directory: cli
+        run: node dist/index.js --help
