@@ -79,6 +79,21 @@ async def create_agent(body: AgentCreate, request: Request):
         did = kp["did"]
         returned_private = kp["private_key"]
 
+    # Seat limit check (VPC license)
+    from config import get_settings
+    if get_settings().vpc_mode:
+        from services.license import get_license
+        lic = get_license()
+        if lic.seats != -1:
+            count = await pool.fetchval(
+                "SELECT COUNT(*) FROM codios.agents WHERE org_id=$1 AND status='active'", org_id
+            )
+            if count >= lic.seats:
+                raise HTTPException(
+                    status_code=402,
+                    detail=f"License seat limit reached ({lic.seats} agents). Contact sales@midlantics.com to upgrade."
+                )
+
     # Check DID uniqueness
     existing = await pool.fetchrow("SELECT id FROM codios.agents WHERE did = $1", did)
     if existing:
