@@ -38,7 +38,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "@noble/curves": "^1.4.0",
+    "@noble/curves": "^2.2.0",
     "bs58": "^6.0.0"
   },
   "devDependencies": {
