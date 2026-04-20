@@ -266,12 +266,14 @@ CREATE TABLE IF NOT EXISTS codios.webhook_endpoints (
   org_id      TEXT NOT NULL REFERENCES codios.organizations(id) ON DELETE CASCADE,
   url         TEXT NOT NULL,
   secret      TEXT NOT NULL,
+  enc_key_id  TEXT NOT NULL DEFAULT 'none',
   events      TEXT[] NOT NULL DEFAULT '{}',
   description TEXT NOT NULL DEFAULT '',
   enabled     BOOLEAN NOT NULL DEFAULT TRUE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE codios.webhook_endpoints ADD COLUMN IF NOT EXISTS enc_key_id TEXT NOT NULL DEFAULT 'none';
 
 CREATE INDEX IF NOT EXISTS codios_webhooks_org ON codios.webhook_endpoints(org_id) WHERE enabled = TRUE;
 
@@ -335,10 +337,12 @@ CREATE TABLE IF NOT EXISTS codios.sso_configs (
   issuer_url     TEXT NOT NULL,
   client_id      TEXT NOT NULL,
   client_secret  TEXT NOT NULL,
+  enc_key_id     TEXT NOT NULL DEFAULT 'none',
   enabled        BOOLEAN NOT NULL DEFAULT TRUE,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE codios.sso_configs ADD COLUMN IF NOT EXISTS enc_key_id TEXT NOT NULL DEFAULT 'none';
 
 ALTER TABLE codios.sso_configs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY IF NOT EXISTS "service_role_all" ON codios.sso_configs FOR ALL TO service_role USING (true) WITH CHECK (true);

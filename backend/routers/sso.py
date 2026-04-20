@@ -73,7 +73,12 @@ async def _get_sso_config(org_id: str) -> dict | None:
         "SELECT * FROM codios.sso_configs WHERE org_id=$1 AND enabled=true",
         org_id,
     )
-    return dict(row) if row else None
+    if not row:
+        return None
+    d = dict(row)
+    from services.encryption import decrypt
+    d["client_secret"] = decrypt(d["client_secret"])
+    return d
 
 
 # ── Login ─────────────────────────────────────────────────────────────────────
@@ -233,19 +238,23 @@ async def save_sso_config(body: SSOConfigBody, request: Request):
     # Validate by running discovery
     await _discover(body.issuer_url)
 
+    from services.encryption import encrypt, current_key_id
+    stored_secret = encrypt(body.client_secret)
+
     pool = await get_pool()
     await pool.execute(
         """
-        INSERT INTO codios.sso_configs (org_id, provider_name, issuer_url, client_id, client_secret)
-        VALUES ($1,$2,$3,$4,$5)
+        INSERT INTO codios.sso_configs (org_id, provider_name, issuer_url, client_id, client_secret, enc_key_id)
+        VALUES ($1,$2,$3,$4,$5,$6)
         ON CONFLICT (org_id) DO UPDATE SET
           provider_name = EXCLUDED.provider_name,
           issuer_url    = EXCLUDED.issuer_url,
           client_id     = EXCLUDED.client_id,
           client_secret = EXCLUDED.client_secret,
+          enc_key_id    = EXCLUDED.enc_key_id,
           updated_at    = NOW()
         """,
-        org_id, body.provider_name, body.issuer_url, body.client_id, body.client_secret,
+        org_id, body.provider_name, body.issuer_url, body.client_id, stored_secret, current_key_id(),
     )
     return {"ok": True}
 
