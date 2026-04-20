@@ -55,19 +55,9 @@ jobs:
       - name: Install & build
         working-directory: sdk-js
         run: npm ci && npm run build
-      - name: Smoke test
+      - name: Run tests
         working-directory: sdk-js
-        run: |
-          node --input-type=module << 'JS'
-          import { generateAgentKeyPair, issueContract, verifyContract } from "./dist/index.js";
-          const a = await generateAgentKeyPair();
-          const b = await generateAgentKeyPair();
-          const plat = await generateAgentKeyPair();
-          const c = await issueContract({ issuer_did: a.did, subject_did: b.did, actions: ["read"], ttl_seconds: 60 }, plat.privateKey);
-          const r = await verifyContract(c.encoded, plat.publicKey, "read");
-          if (!r.valid) throw new Error("verify failed: " + r.reason);
-          console.log("SDK smoke test passed");
-          JS
+        run: npm test
 
   cli:
     name: CLI (TypeScript)

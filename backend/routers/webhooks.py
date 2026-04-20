@@ -69,21 +69,23 @@ async def create_endpoint(body: EndpointCreate, request: Request):
         raise HTTPException(400, f"Unknown event types: {sorted(invalid)}. Valid: {sorted(ALL_EVENTS)}")
 
     from db import get_pool
+    from services.encryption import encrypt, current_key_id
     pool = await get_pool()
     signing_secret = secrets.token_hex(32)
+    stored_secret = encrypt(signing_secret)
 
     row = await pool.fetchrow(
         """
-        INSERT INTO codios.webhook_endpoints (org_id, url, secret, description, events)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO codios.webhook_endpoints (org_id, url, secret, enc_key_id, description, events)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id, created_at
         """,
-        org_id, str(body.url), signing_secret, body.description, body.events,
+        org_id, str(body.url), stored_secret, current_key_id(), body.description, body.events,
     )
     return {
         "ok": True,
         "id": row["id"],
-        "secret": signing_secret,
+        "secret": signing_secret,  # raw — returned once, never stored plaintext if BYOK enabled
         "warning": "Store this secret securely — it will not be shown again. Use it to verify webhook signatures.",
     }
 
@@ -190,11 +192,12 @@ async def ping_endpoint(endpoint_id: str, request: Request):
         raise HTTPException(404, "Endpoint not found")
 
     from services.webhook_dispatcher import _deliver, _sign
+    from services.encryption import decrypt
     import time, json
     body = json.dumps({"event": "ping", "org_id": org_id, "data": {}}, separators=(",", ":"))
     ts = str(int(time.time()))
     asyncio.create_task(
-        _deliver(endpoint_id, row["url"], row["secret"], body, ts, "ping", org_id)
+        _deliver(endpoint_id, row["url"], decrypt(row["secret"]), body, ts, "ping", org_id)
     )
     return {"ok": True, "message": "Ping dispatched"}
 

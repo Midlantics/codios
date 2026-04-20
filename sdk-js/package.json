@@ -22,6 +22,7 @@
   "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsc",
+    "test": "node --test test/contract.test.js",
     "prepublishOnly": "npm run build"
   },
   "keywords": ["ai", "agents", "a2a", "security", "contracts", "ed25519", "codios"],
