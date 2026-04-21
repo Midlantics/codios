@@ -7,7 +7,7 @@ from db import get_pool, close_pool
 from services.redis_client import get_redis, close_redis
 from services.audit_buffer import start_flush_task, stop_flush_task
 from services.scheduler import start_scheduler, stop_scheduler
-from routers import health, agents, contracts, audit, keys, nonces, billing, enforce, policies, alert_rules, sso, team, webhooks
+from routers import health, agents, contracts, audit, keys, nonces, billing, enforce, policies, alert_rules, sso, team, webhooks, threat_detection
 
 
 async def _apply_schema() -> None:
@@ -70,6 +70,7 @@ app.include_router(billing.router)
 app.include_router(enforce.router)
 app.include_router(policies.router)
 app.include_router(alert_rules.router)
+app.include_router(threat_detection.router)
 app.include_router(sso.router)
 app.include_router(team.router)
 app.include_router(webhooks.router)
