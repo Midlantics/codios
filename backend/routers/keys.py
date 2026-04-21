@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import uuid
 from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 from db import get_pool
@@ -126,6 +127,61 @@ async def byok_rotate(body: RotateBody, request: Request):
         "ok": True,
         "rotated": counts,
         "next_step": "Set BYOK_KEY=<new_key> in your environment and restart the service.",
+    }
+
+
+@router.post("/bootstrap", status_code=201)
+async def bootstrap_key(request: Request):
+    """
+    One-time VPC bootstrap: creates the first org and API key.
+    Called automatically by setup-vpc.sh via x-vpc-bootstrap header.
+    Blocked once any API key exists, so it cannot be replayed.
+    """
+    from config import get_settings
+    settings = get_settings()
+
+    if not settings.vpc_mode:
+        raise HTTPException(status_code=404)
+
+    provided = request.headers.get("x-vpc-bootstrap", "")
+    if not provided or provided != settings.gateway_secret:
+        raise HTTPException(status_code=401, detail="Invalid bootstrap secret")
+
+    pool = await get_pool()
+
+    existing = await pool.fetchval("SELECT COUNT(*) FROM codios.api_keys")
+    if existing > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Bootstrap already complete. Use your existing API key.",
+        )
+
+    org_id = str(uuid.uuid4())
+    await pool.execute(
+        "INSERT INTO codios.organizations (id, plan) VALUES ($1, 'enterprise') ON CONFLICT DO NOTHING",
+        org_id,
+    )
+    await pool.execute(
+        """
+        INSERT INTO codios.org_members (org_id, user_id, email, role, status, joined_at)
+        VALUES ($1, $1, 'admin@localhost', 'owner', 'active', NOW())
+        ON CONFLICT DO NOTHING
+        """,
+        org_id,
+    )
+
+    raw = _PREFIX + secrets.token_urlsafe(32)
+    key_hash = hashlib.sha256(raw.encode()).hexdigest()
+    await pool.execute(
+        "INSERT INTO codios.api_keys (org_id, name, key_hash) VALUES ($1, 'default', $2)",
+        org_id, key_hash,
+    )
+
+    return {
+        "ok": True,
+        "key": raw,
+        "org_id": org_id,
+        "warning": "Store this key securely — it will not be shown again.",
     }
 
 
