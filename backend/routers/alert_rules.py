@@ -5,6 +5,7 @@ Alert rules define thresholds that trigger email notifications when anomalous
 agent behavior is detected. Supported condition types:
   denial_spike        — N+ denials in the last M minutes
   rate_limit_exceeded — contract max_calls limit was hit
+  agent_inactive      — no heartbeat from an agent in N hours (threshold = hours)
 
 The cron job (Vercel, every minute) evaluates rules and fires emails via Resend.
 Cooldown prevents repeat alerts within cooldown_minutes of the last fire.
@@ -20,7 +21,7 @@ from routers.billing import require_feature
 
 router = APIRouter(prefix="/alert-rules")
 
-_CONDITION_TYPES = {"denial_spike", "rate_limit_exceeded"}
+_CONDITION_TYPES = {"denial_spike", "rate_limit_exceeded", "agent_inactive"}
 _MAX_EMAILS = 10
 
 

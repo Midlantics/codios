@@ -5,17 +5,19 @@ POST /enforce
   Reads X-Codios-Contract header (base64 encoded contract).
   Performs full enforcement pipeline:
     1. Decode + signature verify   (offline, ~0ms)
-    2. Nonce consume               (Redis SET NX, ~0.5ms)
-    3. Policy evaluate             (Python rules or OPA, ~0ms)
-    4. Call counter increment      (Redis INCR, ~0.5ms)
-    5. Audit log                   (async, non-blocking)
+    2. IP rate limit               (Redis INCR, ~0.5ms)
+    3. Nonce consume               (Redis SET NX, ~0.5ms)
+    4. Policy evaluate             (Python rules or OPA, ~0ms)
+    5. Call counter increment      (Redis INCR, ~0.5ms)
+    6. Audit log                   (async, non-blocking)
 
 Returns:
   200  { allowed: true }
   403  { allowed: false, deny_reason: "..." }
+  429  { detail: "rate_limit_exceeded" }
 
 No authentication required — the contract signature is the proof.
-Rate-limited by IP at the infra level (Cloudflare / Railway).
+Per-IP rate limit: 200 requests/minute enforced in Redis (fixed window).
 """
 from __future__ import annotations
 
@@ -90,11 +92,22 @@ async def enforce(body: EnforceBody, request: Request):
         _log_denied(contract, body, request, "invalid_contract", 0)
         raise HTTPException(status_code=400, detail="Invalid expires_at in contract")
 
-    # ── 4. Nonce consumption (replay defense) ─────────────────────────────────
+    redis = await get_redis()
+
+    # ── 4. Per-IP rate limiting (200 req/min) ────────────────────────────────
+    if redis is not None:
+        ip = _get_ip(request)
+        if ip:
+            rl_key = f"codios:rl:ip:{ip}"
+            count = await redis.incr(rl_key)
+            if count == 1:
+                await redis.expire(rl_key, 60)
+            if count > 200:
+                raise HTTPException(status_code=429, detail="rate_limit_exceeded")
+
+    # ── 5. Nonce consumption (replay defense) ─────────────────────────────────
     nonce = contract.get("nonce", "")
     contract_id = contract.get("contract_id", "")
-
-    redis = await get_redis()
     if redis is not None:
         ttl = max(1, int((expires_at - datetime.now(timezone.utc)).total_seconds()))
         stored = await redis.set(f"codios:nonce:{nonce}", contract_id, ex=ttl, nx=True)
