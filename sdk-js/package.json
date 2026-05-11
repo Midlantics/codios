@@ -43,7 +43,7 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
-    "@types/node": "^20",
+    "@types/node": "^25",
     "typescript": "^5.7.0"
   },
   "peerDependencies": {
