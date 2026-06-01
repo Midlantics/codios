@@ -21,7 +21,7 @@ async def get_pool() -> asyncpg.Pool:
             )
         except Exception as e:
             raise RuntimeError(
-                f"Database connection failed. Check DATABASE_URL. Error: {e}"
+                f"Database connection failed. Check DATABASE_URL.  Error: {e}"
             ) from e
     return _pool
 

@@ -1,6 +1,6 @@
 """
 Custom OPA policy management.
-
+ 
 Orgs on the Pro plan can write custom Rego policies that extend or override
 the base scope rules. Policies are stored as Rego source text. Testing
 requires OPA_URL to be configured; activation stores the policy and flags it

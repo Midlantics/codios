@@ -1,7 +1,7 @@
 /**
  * codios verify
  *
- * Verify a signed contract offline — no network call required.
+ * Verify a signed contract offline — no network call required. 
  * Reads the contract from --contract (base64) or stdin.
  */
 import { Command } from "commander";

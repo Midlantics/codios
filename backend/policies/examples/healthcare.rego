@@ -7,7 +7,7 @@ import future.keywords.in
 # Actions that access patient data require the contract to declare
 # data_classification = "phi" in resource_limits.
 # Payload logging is always forbidden for PHI-classified contracts.
-#
+# 
 # Compliance: HIPAA minimum necessary rule, EU AI Act data minimization.
 
 default allow_patient_access = false

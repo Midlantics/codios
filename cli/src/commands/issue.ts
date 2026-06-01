@@ -1,5 +1,5 @@
 /**
- * codios issue
+ * codios issue 
  *
  * Issue a signed capability contract between two registered agents.
  * Outputs the contract JSON and its base64-encoded form (for X-Codios-Contract header).

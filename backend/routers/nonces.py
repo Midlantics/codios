@@ -1,6 +1,6 @@
 """
 Nonce consumption endpoint — replay defense for Codios contracts.
-
+ 
 Each contract carries a unique nonce. When Agent B receives a request, the
 Codios middleware calls POST /nonces/consume. A Redis SET NX records the nonce
 with a TTL matching the contract expiry. Any retry of the same nonce is rejected.

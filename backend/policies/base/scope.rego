@@ -10,7 +10,7 @@ default deny_reason = ""
 
 # ── Main allow rule ───────────────────────────────────────────────────────────
 # All conditions must pass. Order of evaluation is declaration order,
-# but deny_reason priority is defined explicitly below.
+# but deny_reason priority is defined explicitly below. 
 
 allow if {
     not expired

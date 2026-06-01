@@ -1,5 +1,5 @@
 /**
- * codios register
+ * codios register 
  *
  * Register an agent in the Codios registry.
  * Requires CODIOS_API_KEY (or --api-key) and a public key.

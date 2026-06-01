@@ -3,7 +3,7 @@ Audit Log — append-only record of every contract enforcement decision.
 
 The DB-level triggers (audit_logs_immutable) prevent UPDATE/DELETE at the
 Postgres level. The API also enforces append-only: no PUT/DELETE endpoints.
-
+ 
 Export endpoints produce JSONL or CSV with a SHA-256 integrity hash, and
 optionally upload to S3 for immutable archival (ISO 27001 A.12.4).
 """

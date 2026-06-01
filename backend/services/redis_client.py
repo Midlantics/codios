@@ -1,5 +1,5 @@
 """
-Redis client for nonce caching and rate limiting.
+Redis client for nonce caching and rate limiting.  
 Falls back gracefully to None if REDIS_URL is not set or connection fails.
 """
 from __future__ import annotations

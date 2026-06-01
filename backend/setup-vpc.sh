@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Codios VPC setup — generates keys and starts services.
-# Usage:
+# Usage: 
 #   ./setup-vpc.sh              # full setup + start
 #   ./setup-vpc.sh --keys-only  # generate keys and print, don't start
 

@@ -3,7 +3,7 @@ package codios.identity
 import future.keywords.if
 
 # ── Agent identity verification ───────────────────────────────────────────────
-# The caller's DID must match the issuer DID recorded in the contract.
+# The caller's DID must match the issuer DID recorded in the contract. 
 # This prevents Agent C from reusing a contract issued to Agent A.
 
 default trusted = false

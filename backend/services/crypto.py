@@ -1,6 +1,6 @@
 """
 Ed25519 key generation, DID:key construction, and contract signing/verification.
-
+ 
 DID:key spec: https://w3c-ccg.github.io/did-method-key/#ed25519-x25519
   - Generate Ed25519 keypair (32-byte raw keys)
   - Prefix public key with multicodec 0xed 0x01
@@ -23,7 +23,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, PrivateFormat, NoEncryption
 
-# Multicodec prefix for Ed25519 public key
+# Multicodec prefix for Ed25519 public key 
 _ED25519_PREFIX = bytes([0xED, 0x01])
 
 

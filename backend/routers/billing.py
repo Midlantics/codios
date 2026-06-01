@@ -1,6 +1,6 @@
 """
 Billing stubs for the open-source / VPC edition.
-
+ 
 All organizations get the 'enterprise' plan — every feature is unlocked.
 In the commercial SaaS edition (codios.midlantics.com) this module connects
 to Stripe and gates features by subscription plan.

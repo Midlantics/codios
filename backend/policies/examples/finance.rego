@@ -7,7 +7,7 @@ import future.keywords.in
 # High-value transfer actions require an explicit "high_value_transfer" capability
 # in the contract's allowed_actions list. This prevents a general "transfer"
 # permission from authorizing wire transfers or withdrawals over a threshold.
-#
+# 
 # Usage: combine with base/scope.rego — this policy adds an extra check on top.
 
 default allow_transfer = false

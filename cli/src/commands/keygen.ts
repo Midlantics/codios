@@ -1,5 +1,5 @@
 /**
- * codios keygen
+ * codios keygen 
  *
  * Generate a new Ed25519 keypair for agent registration.
  * The private key is shown ONCE — store it immediately in your env vars.

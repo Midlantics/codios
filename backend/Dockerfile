@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# OPA binary — for optional WASM policy compilation at build time
+# OPA binary — for optional WASM policy compilation at build time  
 RUN apt-get update && apt-get install -y --no-install-recommends curl && \
     curl -sL -o /usr/local/bin/opa \
       https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static && \

@@ -1,5 +1,5 @@
 /**
- * Shared helpers: config resolution, API client, output formatting.
+ * Shared helpers: config resolution, API client, output formatting. 
  */
 import pc from "picocolors";
 import { readFileSync } from "node:fs";

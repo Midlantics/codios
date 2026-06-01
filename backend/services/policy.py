@@ -1,6 +1,6 @@
 """
-Policy evaluation for Codios contracts.
-
+Policy evaluation for Codios contracts. 
+ 
 Primary: pure-Python implementation of the Rego scope rules — ~0ms, no network.
 Optional: delegate to OPA REST API if OPA_URL env var is set (e.g. for custom
   per-org Rego policies stored in the database).
