@@ -2,7 +2,7 @@
  * Codios signed capability contracts.
  *
  * Contracts are signed with the Codios platform Ed25519 key and verified
- * offline — no network call required on the hot path.
+ * offline — no network call required on the hot path. 
  */
 import { createHash, randomBytes } from "node:crypto";
 import { signData, verifySignature } from "./keys.js";

@@ -2,7 +2,7 @@
  * Ed25519 key generation and DID:key construction.
  *
  * DID:key spec: https://w3c-ccg.github.io/did-method-key/#ed25519-x25519
- * Uses @noble/curves — audited, zero-dependency, works in Node + browsers.
+ * Uses @noble/curves — audited, zero-dependency, works in Node + browsers. 
  */
 import { ed25519 } from "@noble/curves/ed25519";
 import bs58 from "bs58";

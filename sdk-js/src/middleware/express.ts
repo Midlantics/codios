@@ -8,7 +8,7 @@
  *     codiosPublicKey: process.env.CODIOS_PUBLIC_KEY!,
  *     gatewayUrl: process.env.CODIOS_GATEWAY_URL,   // for nonce/replay check
  *     requiredAction: "summarize",
- *   }));
+ *   })); 
  */
 import type { Request, Response, NextFunction } from "express";
 import { verifyContract, decodeContract, type SignedContract } from "../contract.js";

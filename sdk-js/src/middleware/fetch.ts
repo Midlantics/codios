@@ -9,7 +9,7 @@
  *     { codiosPublicKey: process.env.CODIOS_PUBLIC_KEY!, requiredAction: "summarize" },
  *     async (req, contract) => {
  *       return Response.json({ result: "done" });
- *     },
+ *     }, 
  *   );
  */
 import { verifyContract, decodeContract, type SignedContract } from "../contract.js";
