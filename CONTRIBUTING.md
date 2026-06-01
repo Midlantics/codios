@@ -1,4 +1,4 @@
-# Contributing to Codios 
+# Contributing to Codios
 
 Thank you for your interest in contributing!
 
