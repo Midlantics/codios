@@ -1,5 +1,5 @@
 # Security Policy
-
+ 
 ## Reporting a vulnerability
 
 **Please do not open public GitHub issues for security vulnerabilities.**
